@@ -18,8 +18,8 @@ export interface EngineDeps {
   probe(url: string): Promise<number>
   now(): number
   delay(ms: number): Promise<void>
-  /** 超时后按进程树强杀（Windows：taskkill /T /F）。 */
-  treeKill(pid: number): Promise<void>
+  /** 按进程树终止（Windows：taskkill /T [\/F]）。force=false 温和关闭。 */
+  treeKill(pid: number, force?: boolean): Promise<void>
   /** spawn 时继承的基础环境（默认 process.env）。 */
   envBase?: Record<string, string>
 }
@@ -126,14 +126,15 @@ export function createEngineProcess(paths: EnginePaths, port: number, deps: Engi
     const c = child
     if (c == null) { setState('stopped'); return }
     stopInFlight = (async () => {
-      try { c.kill() } catch { /* 已死 */ }
-      const outcome = await Promise.race([
+      // Windows 语义：kill() 只杀主进程，引擎的 worker 子进程会孤儿化；
+      // 而 taskkill /T 需要根进程存活才能枚举整树。因此先温和树关、
+      // 再等待、最后强制树杀——全程不单独 kill 主进程。
+      try { await deps.treeKill(c.pid, false) } catch { /* 树已不存在 */ }
+      await Promise.race([
         c.exited.then(() => 'exited' as const),
         deps.delay(5_000).then(() => 'timeout' as const),
       ])
-      if (outcome === 'timeout') {
-        try { await deps.treeKill(c.pid) } catch { /* 进程可能恰好退出 */ }
-      }
+      try { await deps.treeKill(c.pid, true) } catch { /* 已全灭——预期路径 */ }
       setState('stopped')
     })()
     return stopInFlight
@@ -185,8 +186,9 @@ export function createRealEngineDeps(): EngineDeps {
     }),
     now: () => Date.now(),
     delay: ms => new Promise(resolve => setTimeout(resolve, ms)),
-    treeKill: pid => new Promise((resolve, reject) => {
-      execFile('taskkill', ['/PID', String(pid), '/T', '/F'], err => { err ? reject(err) : resolve() })
+    treeKill: (pid, force) => new Promise((resolve, reject) => {
+      const args = ['/PID', String(pid), '/T', ...(force ? ['/F'] : [])]
+      execFile('taskkill', args, err => { err ? reject(err) : resolve() })
     }),
   }
 }
