@@ -18,8 +18,9 @@ const ZIP = 'node-v24.19.0-win-x64.zip'
 
 async function fetchBuffer(url: string, redirects = 5): Promise<Buffer> {
   const res = await fetch(url, { redirect: 'manual' })
-  if ((res.status >= 300) && (res.status < 400) && res.headers.location && redirects > 0) {
-    return fetchBuffer(new URL(res.headers.location, url).href, redirects - 1)
+  const location = res.headers.get('location')
+  if ((res.status >= 300) && (res.status < 400) && location && redirects > 0) {
+    return fetchBuffer(new URL(location, url).href, redirects - 1)
   }
   if (!res.ok) throw new Error(`下载失败 ${res.status}: ${url}`)
   return Buffer.from(await res.arrayBuffer())

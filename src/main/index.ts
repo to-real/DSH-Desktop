@@ -1,4 +1,7 @@
 import { app, dialog, ipcMain } from 'electron'
+// asar 内 CJS 互操作不支持具名导出（打包环境实测），须走默认导出解构
+import electronUpdaterPkg from 'electron-updater'
+const { autoUpdater } = electronUpdaterPkg
 import { join } from 'node:path'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { createApp, type AppDeps } from './app-service.js'
@@ -90,8 +93,11 @@ async function bootstrap(): Promise<void> {
     windows: createRealWindows(),
     storage,
     updater: {
-      // Task 10 接 electron-updater；此刻占位保证装配完整
-      async checkAndNotify() { /* noop */ },
+      async checkAndNotify() {
+        autoUpdater.autoDownload = true
+        // v0.1：下载完成后在下次退出时安装，不弹更新 UI
+        await autoUpdater.checkForUpdatesAndNotify()
+      },
     },
     lock: {
       acquire: () => gotLock,

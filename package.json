@@ -25,5 +25,8 @@
     "tsx": "^4.22.0",
     "typescript": "^6.0.0",
     "vitest": "^4.1.0"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   }
 }
