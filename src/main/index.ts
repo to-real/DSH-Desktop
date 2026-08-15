@@ -6,6 +6,7 @@ import { createEngineProcess, createRealEngineDeps } from './engine-process.js'
 import { pickFreePort, listenProbe } from './port-picker.js'
 import { createAppStorage, realFs } from './storage.js'
 import { createRealWindows } from './windows.js'
+import { createOrphanCleaner, realListProcesses, realTreeKill } from './orphan-cleaner.js'
 
 // ---------- 资源与数据目录 ----------
 
@@ -54,6 +55,14 @@ async function writeCredentials(dshHome: string, apiKey: string): Promise<void> 
 async function bootstrap(): Promise<void> {
   const paths = enginePaths()
   const storage = createAppStorage({ baseDir: appDataDir(), fs: realFs() })
+
+  // 断电/强杀残留的引擎进程：启动前清理（排除自身）
+  const orphanCleaner = createOrphanCleaner(paths.engineEntry, {
+    listProcesses: realListProcesses,
+    treeKill: realTreeKill,
+  })
+  const killed = await orphanCleaner.clean()
+  if (killed.length > 0) console.log(`[dsh-desktop] 已清理 ${killed.length} 个残留引擎进程: ${killed.join(', ')}`)
 
   const port = await pickFreePort({ isFree: listenProbe() })
   const engine = createEngineProcess(paths, port, createRealEngineDeps())

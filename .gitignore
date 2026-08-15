@@ -20,3 +20,4 @@ resources/
 # 编辑器
 .vscode/
 .idea/
+tests/.smoke-dsh-home/
