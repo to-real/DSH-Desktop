@@ -155,6 +155,11 @@ export function createEngineProcess(paths: EnginePaths, port: number, deps: Engi
 export function realChild(child: ChildProcess): EngineChild {
   const exited = new Promise<{ code: number | null }>(resolve => {
     child.once('exit', code => resolve({ code: code ?? null }))
+    // spawn 失败（文件不存在/权限等）发 error 而非 exit：映射为退出，让崩溃分支尽快接管
+    child.once('error', err => {
+      child.stderr?.emit('data', `spawn error: ${err.message}\n`)
+      resolve({ code: -1 })
+    })
   })
   return {
     pid: child.pid ?? -1,

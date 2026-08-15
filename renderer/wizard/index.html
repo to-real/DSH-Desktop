@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>欢迎使用 DSH-Desktop</title>
+  <link rel="stylesheet" href="index.css">
+</head>
+<body>
+  <main>
+    <h1>欢迎使用 DSH-Desktop</h1>
+    <p class="hint">两步完成配置，之后每次启动直接进入。</p>
+
+    <section class="step">
+      <label for="api-key">1. DeepSeek API Key</label>
+      <input id="api-key" type="password" placeholder="sk-..." autocomplete="off" spellcheck="false">
+      <p class="field-hint">从 platform.deepseek.com 获取，仅保存在本机。</p>
+    </section>
+
+    <section class="step">
+      <label for="workspace">2. 工作区文件夹</label>
+      <div class="row">
+        <input id="workspace" type="text" placeholder="Agent 的工作目录" readonly>
+        <button id="pick" type="button">浏览…</button>
+      </div>
+    </section>
+
+    <p id="error" class="error" hidden></p>
+
+    <div class="actions">
+      <button id="submit" type="button" class="primary">开始使用</button>
+    </div>
+  </main>
+  <script src="index.js"></script>
+</body>
+</html>
