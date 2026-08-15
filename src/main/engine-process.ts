@@ -1,4 +1,4 @@
-import { spawn as cpSpawn, type ChildProcess } from 'node:child_process'
+import { spawn as cpSpawn, execFile, type ChildProcess } from 'node:child_process'
 import http from 'node:http'
 
 export type EngineState = 'idle' | 'starting' | 'healthy' | 'crashed' | 'stopped'
@@ -18,6 +18,8 @@ export interface EngineDeps {
   probe(url: string): Promise<number>
   now(): number
   delay(ms: number): Promise<void>
+  /** 超时后按进程树强杀（Windows：taskkill /T /F）。 */
+  treeKill(pid: number): Promise<void>
   /** spawn 时继承的基础环境（默认 process.env）。 */
   envBase?: Record<string, string>
 }
@@ -116,17 +118,25 @@ export function createEngineProcess(paths: EnginePaths, port: number, deps: Engi
     })
   }
 
+  let stopInFlight: Promise<void> | null = null
+
   async function stop(): Promise<void> {
-    if (state === 'idle') return
+    if (state === 'idle' || state === 'stopped') return
+    if (stopInFlight) return stopInFlight
     const c = child
-    if (c == null) return
-    try { c.kill() } catch { /* 已死 */ }
-    try {
-      await Promise.race([c.exited, deps.delay(5_000).then(() => { throw new Error('stop-timeout') })])
-    } catch {
-      // Task 4 补树杀
-    }
-    setState('stopped')
+    if (c == null) { setState('stopped'); return }
+    stopInFlight = (async () => {
+      try { c.kill() } catch { /* 已死 */ }
+      const outcome = await Promise.race([
+        c.exited.then(() => 'exited' as const),
+        deps.delay(5_000).then(() => 'timeout' as const),
+      ])
+      if (outcome === 'timeout') {
+        try { await deps.treeKill(c.pid) } catch { /* 进程可能恰好退出 */ }
+      }
+      setState('stopped')
+    })()
+    return stopInFlight
   }
 
   return {
@@ -170,5 +180,8 @@ export function createRealEngineDeps(): EngineDeps {
     }),
     now: () => Date.now(),
     delay: ms => new Promise(resolve => setTimeout(resolve, ms)),
+    treeKill: pid => new Promise((resolve, reject) => {
+      execFile('taskkill', ['/PID', String(pid), '/T', '/F'], err => { err ? reject(err) : resolve() })
+    }),
   }
 }

@@ -28,6 +28,7 @@ interface SpawnRecord { cmd: string; args: string[]; env: Record<string, string>
 
 function makeDeps(childFactory: () => FakeChild = fakeChild) {
   const spawns: SpawnRecord[] = []
+  const treeKills: number[] = []
   let nowMs = 0
   const deps: EngineDeps = {
     spawn: (cmd, args, env) => {
@@ -38,8 +39,9 @@ function makeDeps(childFactory: () => FakeChild = fakeChild) {
     probe: vi.fn(async () => 200),
     now: () => nowMs,
     delay: async (ms: number) => { nowMs += ms },
+    treeKill: async (pid: number) => { treeKills.push(pid) },
   }
-  return { deps, spawns, tick: (ms: number) => { nowMs += ms } }
+  return { deps, spawns, treeKills, tick: (ms: number) => { nowMs += ms } }
 }
 
 const PATHS = { nodeExe: 'N:/node.exe', engineEntry: 'E:/bin.js', dshHome: 'H:/dsh-home' }
@@ -108,5 +110,48 @@ describe('EngineProcess', () => {
     const engine = createEngineProcess(PATHS, 45678, deps)
     await engine.start()
     expect(deps.probe).toHaveBeenCalledTimes(2)
+  })
+
+  // ---------- Task 4：停止与强杀 ----------
+
+  it('优雅停止：kill 后进程退出 → stopped 且 stop resolve', async () => {
+    const child = fakeChild()
+    const { deps } = makeDeps(() => child)
+    const engine = createEngineProcess(PATHS, 45678, deps)
+    await engine.start()
+    const stopping = engine.stop()
+    expect(child.killed).toBe(true)
+    child.exit(0)
+    await stopping
+    expect(engine.state()).toBe('stopped')
+  })
+
+  it('5 秒不退则 taskkill 树杀', async () => {
+    const child = fakeChild()
+    const { deps, treeKills } = makeDeps(() => child)
+    const engine = createEngineProcess(PATHS, 45678, deps)
+    await engine.start()
+    await engine.stop()   // fake delay 每次推进虚拟时钟，5s 超时分支触发
+    expect(treeKills).toEqual([4242])
+    expect(engine.state()).toBe('stopped')
+  })
+
+  it('重复 stop 幂等', async () => {
+    const child = fakeChild()
+    const { deps, treeKills } = makeDeps(() => child)
+    const engine = createEngineProcess(PATHS, 45678, deps)
+    await engine.start()
+    child.exit(0)
+    await engine.stop()
+    await engine.stop()
+    expect(treeKills).toEqual([])
+    expect(engine.state()).toBe('stopped')
+  })
+
+  it('idle 状态 stop 是无操作', async () => {
+    const { deps } = makeDeps()
+    const engine = createEngineProcess(PATHS, 45678, deps)
+    await engine.stop()
+    expect(engine.state()).toBe('idle')
   })
 })
