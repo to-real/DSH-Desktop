@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { join } from 'node:path'
 import { createAppStorage, type StorageFs } from '../../src/main/storage.js'
 
 function fakeFs() {
@@ -18,7 +19,7 @@ describe('createAppStorage', () => {
     expect(await storage.isFirstRun()).toBe(true)
     await storage.completeFirstRun()
     expect(await storage.isFirstRun()).toBe(false)
-    expect(files.get('C:/AppData/DSH-Desktop/app-state.json')).toBe('{"firstRunCompleted":true}')
+    expect(files.get(join('C:/AppData/DSH-Desktop', 'app-state.json'))).toBe('{"firstRunCompleted":true}')
   })
 
   it('已有标记文件时新实例 isFirstRun 为 false', async () => {
