@@ -1,8 +1,6 @@
 import type { EngineProcess, EngineState } from './engine-process.js'
 
 export interface AppWindowDeps {
-  /** 首启向导；resolve 仅当用户完成。 */
-  showWizard(): Promise<'completed'>
   showMain(baseUrl: string): void
   showError(diagnosis: string, restart: () => Promise<void>): void
   focusMain(): void
@@ -11,10 +9,6 @@ export interface AppWindowDeps {
 export interface AppDeps {
   engine: Pick<EngineProcess, 'start' | 'stop' | 'onStateChange'>
   windows: AppWindowDeps
-  storage: {
-    isFirstRun(): Promise<boolean>
-    completeFirstRun(): Promise<void>
-  }
   updater: { checkAndNotify(): Promise<void> }
   lock: {
     acquire(): boolean
@@ -31,8 +25,9 @@ export interface App {
 const errorMessage = (err: unknown): string => (err instanceof Error ? err.message : String(err))
 
 /**
- * 桌面行为组合根：所有决策（启动顺序、首启分支、崩溃恢复、退出清理、单实例仲裁）
+ * 桌面行为组合根：所有决策（启动顺序、崩溃恢复、退出清理、单实例仲裁）
  * 集中于此，且不 import 任何 Electron API——可全量假依赖测试（接缝 1）。
+ * 新手引导（API Key / 工作区）完全交给 DSH 原生界面，壳不设门槛。
  */
 export function createApp(deps: AppDeps): App {
   let initialized = false
@@ -62,10 +57,6 @@ export function createApp(deps: AppDeps): App {
 
     try {
       const { baseUrl } = await deps.engine.start()
-      if (await deps.storage.isFirstRun()) {
-        await deps.windows.showWizard()
-        await deps.storage.completeFirstRun()
-      }
       deps.windows.showMain(baseUrl)
     } catch (err) {
       deps.log(`引擎启动失败：${errorMessage(err)}`)

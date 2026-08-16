@@ -1,13 +1,11 @@
-import { app, dialog, ipcMain } from 'electron'
+import { app } from 'electron'
 // asar 内 CJS 互操作不支持具名导出（打包环境实测），须走默认导出解构
 import electronUpdaterPkg from 'electron-updater'
 const { autoUpdater } = electronUpdaterPkg
 import { join } from 'node:path'
-import { mkdir, writeFile } from 'node:fs/promises'
 import { createApp, type AppDeps } from './app-service.js'
 import { createEngineProcess, createRealEngineDeps } from './engine-process.js'
 import { pickFreePort, listenProbe } from './port-picker.js'
-import { createAppStorage, realFs } from './storage.js'
 import { createRealWindows } from './windows.js'
 import { createOrphanCleaner, realListProcesses, realTreeKill } from './orphan-cleaner.js'
 
@@ -40,24 +38,11 @@ if (!gotLock) {
   app.quit()
 }
 
-// ---------- 向导 IPC：凭据写入 + 工作区选择 ----------
-
-ipcMain.handle('wizard:pick-workspace', async () => {
-  const result = await dialog.showOpenDialog({ properties: ['openDirectory'] })
-  return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0]!
-})
-
-async function writeCredentials(dshHome: string, apiKey: string): Promise<void> {
-  await mkdir(dshHome, { recursive: true })
-  // 格式经实测核实：单键扁平 YAML（2026-08-15 于 ~/.dsh/.credentials.yaml）
-  await writeFile(join(dshHome, '.credentials.yaml'), `DEEPSEEK_API_KEY: ${apiKey}\n`, 'utf8')
-}
-
 // ---------- 装配 ----------
+// 新手引导（API Key / 工作区）完全交给 DSH 原生界面，壳不设门槛。
 
 async function bootstrap(): Promise<void> {
   const paths = enginePaths()
-  const storage = createAppStorage({ baseDir: appDataDir(), fs: realFs() })
 
   // 断电/强杀残留的引擎进程：启动前清理（排除自身）
   const orphanCleaner = createOrphanCleaner(paths.engineEntry, {
@@ -70,28 +55,9 @@ async function bootstrap(): Promise<void> {
   const port = await pickFreePort({ isFree: listenProbe() })
   const engine = createEngineProcess(paths, port, createRealEngineDeps())
 
-  // 向导提交：写凭据 + 默认工作区（Task 8 页面接线消费）
-  ipcMain.removeHandler('wizard:submit')
-  ipcMain.handle('wizard:submit', async (_e, data: { apiKey: string; workspace: string }) => {
-    try {
-      if (typeof data?.apiKey !== 'string' || !/^sk-/.test(data.apiKey)) {
-        return { ok: false, error: 'API Key 需以 sk- 开头' }
-      }
-      if (typeof data?.workspace !== 'string' || data.workspace.length === 0) {
-        return { ok: false, error: '请选择工作区文件夹' }
-      }
-      await writeCredentials(paths.dshHome, data.apiKey)
-      await storage.setDefaultWorkspace(data.workspace)
-      return { ok: true }
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err) }
-    }
-  })
-
   const deps: AppDeps = {
     engine,
     windows: createRealWindows(),
-    storage,
     updater: {
       async checkAndNotify() {
         autoUpdater.autoDownload = true
