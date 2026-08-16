@@ -30,3 +30,4 @@ publish:
   provider: github
   owner: to-real
   repo: DSH-Desktop
+  releaseType: release
