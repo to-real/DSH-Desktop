@@ -44,6 +44,9 @@ jobs:
       - name: 安装依赖
         run: npm ci
 
+      - name: 构建（tsc 编译主进程/preload）
+        run: npm run build
+
       - name: staging（Node 24 运行时 + DSH 引擎）
         run: npm run stage
 
