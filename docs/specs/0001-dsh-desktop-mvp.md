@@ -124,6 +124,11 @@
 - **已验证事实**（2026-08-15，本机）：Node 24 + DSH 源码仓库可完整跑通 web 服务/插件挂载/工具调用；`npx @deepseek-ai/dsh web` 官方 npm 路径可用；`--port` 指定随机端口可用；`DSH_HOME` 重定向机制在源码 `packages/util/home-paths` 确认存在。
 - **官方信号**：DSH 的 webserver 文档明确预留了「Electron 经 file:// 加载前端、fetch 走 IPC 桥」的集成方向，本项目 MVP 采用其子集（HTTP 模式），为未来对齐留有空间。
 
+## 修订记录
+
+- **v0.1.1（2026-08-16）**：移除首启向导。用户反馈（正确）：DSH 原生界面已内置 API Key 配置与工作区选择（见用户故事 2/3 的原设计），壳层向导属于重复设卡。首启=直接进入 DSH 界面，Key/工作区交给引擎原生引导。受影响决策：Implementation Decisions 的「首启向导」节作废；storage 模块（首启标记）随之删除；AppDeps 简化（去 storage/showWizard）。
+- v0.1.0（2026-08-16）：首次发布。
+
 ## 附录：共识记录（grilling 产出摘要，2026-08-15）
 
 - 定位：自建干净小壳；社区项目仅参照不照搬（用户明示修正）

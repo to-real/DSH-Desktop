@@ -1,6 +1,6 @@
 {
   "name": "dsh-desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "开箱即用的 DeepSeek Harness 桌面应用 · Out-of-the-box desktop app for DeepSeek Harness",
   "license": "MIT",

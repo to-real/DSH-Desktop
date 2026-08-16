@@ -4,7 +4,7 @@ import type { EngineState } from '../../src/main/engine-process.js'
 
 // ---------- 替身 ----------
 
-function makeDeps(opts: { firstRun?: boolean; acquire?: boolean; startError?: Error } = {}) {
+function makeDeps(opts: { acquire?: boolean; startError?: Error } = {}) {
   const order: string[] = []
   let stateCb: ((s: EngineState) => void) | null = null
   let startCount = 0
@@ -19,14 +19,9 @@ function makeDeps(opts: { firstRun?: boolean; acquire?: boolean; startError?: Er
       onStateChange: cb => { stateCb = cb; return () => { stateCb = null } },
     },
     windows: {
-      showWizard: vi.fn(async () => { order.push('wizard'); return 'completed' as const }),
       showMain: vi.fn((baseUrl: string) => { order.push(`showMain:${baseUrl}`) }),
       showError: vi.fn((_diag: string, _restart: () => void) => { order.push('showError') }),
       focusMain: vi.fn(() => { order.push('focusMain') }),
-    },
-    storage: {
-      isFirstRun: vi.fn(async () => opts.firstRun ?? true),
-      completeFirstRun: vi.fn(async () => { order.push('completeFirstRun') }),
     },
     updater: { checkAndNotify: vi.fn(async () => { order.push('updater') }) },
     lock: {
@@ -51,23 +46,14 @@ function makeDeps(opts: { firstRun?: boolean; acquire?: boolean; startError?: Er
 // ---------- 测试 ----------
 
 describe('createApp', () => {
-  it('标准首启顺序：锁→引擎→向导→标记→主窗口→更新（不阻塞）', async () => {
-    const { deps, order } = makeDeps({ firstRun: true })
-    const app = createApp(deps)
-    await app.init()
+  it('启动顺序：锁→引擎→主窗口→更新（后台）', async () => {
+    const { deps, order } = makeDeps()
+    await createApp(deps).init()
     expect(order).toEqual([
       'engine.start:1',
-      'wizard',
-      'completeFirstRun',
       'showMain:http://127.0.0.1:1',
       'updater',
     ])
-  })
-
-  it('非首启：跳过向导直接主窗口', async () => {
-    const { deps, order } = makeDeps({ firstRun: false })
-    await createApp(deps).init()
-    expect(order).toEqual(['engine.start:1', 'showMain:http://127.0.0.1:1', 'updater'])
   })
 
   it('二次实例：不起引擎不开窗口，触发时聚焦', async () => {

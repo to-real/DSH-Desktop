@@ -8,11 +8,11 @@ const here = fileURLToPath(new URL('.', import.meta.url))
 let mainWin: BrowserWindow | null = null
 
 function preloadPath(): string {
-  // dist/main/../preload/wizard.js（tsc 产出结构）
-  return join(here, '..', 'preload', 'wizard.js')
+  // dist/main/../preload/bridge.js（tsc 产出结构）
+  return join(here, '..', 'preload', 'bridge.js')
 }
 
-function rendererPath(page: 'wizard' | 'engine-error'): string {
+function rendererPath(page: 'error-page'): string {
   return join(here, '..', '..', 'renderer', page, 'index.html')
 }
 
@@ -50,30 +50,6 @@ export function focusMainWindow(): void {
   }
 }
 
-/** 首启向导；用户完成（wizard:submit 成功）时 resolve。 */
-export function showWizardWindow(): Promise<'completed'> {
-  return new Promise(resolve => {
-    const win = new BrowserWindow({ ...windowOptions(520, 680), resizable: false, modal: false })
-    const handler = (_e: unknown, result: { ok: boolean; error?: string }) => {
-      if (result.ok) {
-        ipcMain.removeHandler('wizard:submit')
-        resolve('completed')
-        win.close()
-      } else {
-        win.webContents.send('wizard:error', result.error ?? '提交失败')
-      }
-    }
-    ipcMain.removeHandler('wizard:submit')
-    ipcMain.handle('wizard:submit', handler)
-    void win.loadFile(rendererPath('wizard'))
-    win.on('closed', () => {
-      // 用户直接关窗：向导视为放弃，但应用继续（下次启动仍是首启）
-      ipcMain.removeHandler('wizard:submit')
-      resolve('completed')
-    })
-  })
-}
-
 /** 引擎故障页；渲染进程经 IPC 请求重启。 */
 export function showErrorWindow(diagnosis: string, restart: () => Promise<void>): void {
   const win = new BrowserWindow({ ...windowOptions(640, 480), resizable: false })
@@ -82,7 +58,7 @@ export function showErrorWindow(diagnosis: string, restart: () => Promise<void>)
     await restart()
     win.close()
   })
-  void win.loadFile(rendererPath('engine-error'))
+  void win.loadFile(rendererPath('error-page'))
   win.webContents.on('did-finish-load', () => {
     win.webContents.send('engine-error:info', diagnosis)
   })
@@ -91,7 +67,6 @@ export function showErrorWindow(diagnosis: string, restart: () => Promise<void>)
 /** 组合根所需的窗口依赖（接缝 1 的真实实现）。 */
 export function createRealWindows(): AppWindowDeps {
   return {
-    showWizard: showWizardWindow,
     showMain: showMainWindow,
     showError: showErrorWindow,
     focusMain: focusMainWindow,
