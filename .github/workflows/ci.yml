@@ -55,5 +55,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: 合并发布竞态产生的重复 Release
+        run: node scripts/consolidate-release.mjs "$env:GITHUB_REF_NAME"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: 打包产物冒烟（发布门禁）
         run: npx playwright install --with-deps chromium || true && npx playwright test tests/e2e --config playwright.config.ts
