@@ -1,3 +1,8 @@
+> **本项目已演化 → [Efferent](https://github.com/to-real/Efferent)**
+>
+> 定位从「DSH 的桌面壳」升级为独立 agent 产品（对标 Codex/Claude 桌面版，DSH 为隐形引擎）。
+> 全部工程底盘（引擎管理/打包/更新/CI）已继承至新仓库；本仓库归档留档。
+
 # DSH-Desktop
 
 基于 DeepSeek Harness 的开箱即用 Windows 桌面应用（Electron + sidecar 引擎）。
